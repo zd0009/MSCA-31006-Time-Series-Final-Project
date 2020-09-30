@@ -1,8 +1,8 @@
 # MSCA-31006-Time-Series-Final-Project
 ### This repository is created for the Time Series Final Peoject
 ## Team Member 
-Duo Zhou: zd0009@gmail.com /n
-          zd0009@uchicago.edu /n
+Duo Zhou: zd0009@gmail.com br
+          zd0009@uchicago.edu br
 Amily Huang: amily.huang10@gmail.com
              yunh@uchicago.edu
 Lui Flosi: luiflosi@uchicago.edu
