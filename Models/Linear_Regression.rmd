@@ -1,0 +1,281 @@
+---
+title: "Time Series Final Project - Linear Regression"
+author: "Lucia Ronchi Darre"
+date: "11/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Libraries
+
+```{r}
+library(ggplot2)
+library(MASS)
+library(fpp)
+```
+
+# Import data
+
+Specify path:
+```{r}
+path <- "/Users/luciaronchi/Documents/MSCA/Time_Series/Final_Project/Data"
+```
+
+Load trips data:
+```{r}
+trips_data <- read.csv(paste(path, "RidershipTS.csv", sep = "/"), stringsAsFactors = FALSE)
+```
+
+Load Temperature, Precipitation, and Wind Speed data:
+```{r}
+weather_data <- read.csv(paste(path, "weather_final.csv", sep = "/"), stringsAsFactors = FALSE)
+```
+
+# Explore and Prepare data
+
+## Temperature
+
+Cast Date variable as date type:
+```{r}
+weather_data$DATE <- as.Date(weather_data$DATE, "%Y-%m-%d")
+```
+
+
+Plot histogram of temperatures:
+```{r}
+hist(weather_data$Daily.Avg.Temperature, main = "Distribution of Average Daily Temperature", ylab = "Frequency", xlab = "Temperature (F)")
+```
+
+## Precipitation
+
+Plot histogram of precipitation:
+```{r}
+hist(weather_data$Daily.Total.Precipitation, main = "Distribution of Total Daily Temperature", ylab = "Frequency", xlab = "Precipitation (Inches)")
+```
+
+Given that the precipitation data is zero-inflated, we will convert it to binary:
+```{r}
+weather_data$precipitation_flag <- 0
+weather_data$precipitation_flag[weather_data$Daily.Total.Precipitation > 0] <- 1
+```
+
+
+## Wind Speed
+
+Plot histogram of Wind Speed:
+```{r}
+hist(weather_data$Daily.Avg.WindSpeed, main = "Distribution of Average Daily Wind Speed", ylab = "Frequency", xlab = "Wind Speed (km/h)")
+```
+
+## Trips
+
+Cast Date variable as date type:
+```{r}
+trips_data$Date <- as.Date(trips_data$Date, "%m/%d/%Y")
+```
+
+Convert trips to time series for easier plotting:
+```{r}
+trips_ts <- ts(trips_data$number_of_trips, frequency = 365, start = c(2018, 305))
+```
+
+Plot trips over time:
+```{r}
+plot(trips_ts, main = "Daily Number of Rideshare Trips", xlab = "Time", ylab = "Number of Trips")
+```
+
+## Time
+
+Create time-related variables that might be useful for the model:
+```{r}
+trips_data$day_of_week <- weekdays(as.Date(trips_data$Date))
+trips_data$day_of_month <- format(trips_data$Date, format = "%d")
+```
+
+### Day of Week
+
+Set days of the week as factors:
+```{r}
+trips_data <- within(trips_data, 
+                   day_of_week <- factor(day_of_week, 
+                                      levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")))
+```
+
+Distribution for Day of Week:
+```{r}
+ggplot(trips_data[,c("number_of_trips", "day_of_week")], aes(x=day_of_week,y = number_of_trips))+ geom_bar(stat = "identity") + theme_bw() + 
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) 
+```
+
+### Day of Month
+
+Distribution for Day of Week:
+```{r}
+ggplot(trips_data[,c("number_of_trips", "day_of_month")], aes(x=day_of_month,y = number_of_trips))+ geom_bar(stat = "identity") + theme_bw() + 
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) 
+```
+
+### End of Month
+
+Create a variable that indicates that it's end of the month:
+```{r}
+trips_data$end_of_month <- 0
+trips_data$end_of_month[trips_data$day_of_month >= 29] <- 1
+```
+
+
+### Weekend
+
+Create a variable that groups Friday, Saturday, and Sunday:
+```{r}
+trips_data$weekend_flag <- 0
+trips_data$weekend_flag[trips_data$day_of_week == "Friday" | trips_data$day_of_week == "Saturday" | trips_data$day_of_week == "Sunday" ] <- 1
+```
+
+
+
+# Merge and Prepare Data
+
+## Merge data
+
+Merge trips and weather data:
+```{r}
+data <- merge(x = trips_data, y = weather_data, by.x = "Date", by.y = "DATE")
+```
+
+
+## Remove unnecesary columns
+
+Keep only certain columns:
+```{r}
+data <- data[c("number_of_trips", "Date", "day_of_week", "day_of_month", "end_of_month", "weekend_flag", "Daily.Avg.Temperature", "Daily.Avg.WindSpeed", "precipitation_flag")]
+```
+
+## Split into Train and Test
+
+Select last day for the training period:
+```{r}
+train_end <- "2019-10-31"
+```
+
+Create train data:
+```{r}
+train_data <- data[data$Date <= train_end,]
+```
+
+Create test data:
+```{r}
+test_data <- data[data$Date > train_end,]
+```
+
+
+# Fit a Linear Regression on Train data
+
+## Fit a full model
+
+Fit linear regression with all variables as predictors:
+```{r}
+m1 <- lm(formula = "number_of_trips ~ .", data = train_data)
+```
+
+Get summary:
+```{r}
+summary(m1)
+```
+
+## Step AIC
+
+Find the model with the best possible AIC:
+```{r}
+m2 <- stepAIC(object = m1, direction = "both", trace = TRUE, )
+```
+
+## Reduced model
+
+Summary of the model found with stepAIC (it dropped day_of_month and WindSpeed)
+```{r}
+summary(m2)
+```
+
+## Plot Forecasted Train Data
+
+Transform to TS object:
+```{r}
+train_predictions_ts <- ts(m2$fitted.values, frequency = 365, start = c(2018, 305))
+train_ts <- ts(train_data$number_of_trips, frequency = 365, start = c(2018, 305))
+```
+
+Plot predictions vs actual data:
+```{r, fig.width = 3, fig.height = 1}
+plot(train_ts, col = "blue", main = "Number of Trips Actual (Blue) vs Forecasted (Red)", ylab = "Number of Trips")
+lines(train_predictions_ts, col = "red")
+```
+
+
+## R2 in Train
+
+```{r}
+summary(m2)$adj.r.squared
+```
+
+## RMSE in Train
+
+Calculate RMSE in Train:
+```{r}
+sqrt(sum((m2$residuals)**2))
+```
+
+## KPSS of Residuals in Train
+
+```{r}
+kpss.test(x = m2$residuals, null = "Trend")
+```
+
+
+## ACF of Residuals in Train
+
+```{r}
+acf(x = m2$residuals)
+```
+
+
+# Forecast on Test Data
+
+Forecast on test data using the best model found:
+```{r}
+test_predictions <- predict(object = m2, new = test_data)
+```
+
+## Plot Forecasted Test data
+
+Transform to TS object:
+```{r}
+test_predictions_ts <- ts(test_predictions, frequency = 365, start = c(2019, 305))
+```
+
+Plot predictions vs actual data:
+```{r}
+plot(trips_ts, col = "blue", main = "Number of Trips: Actual (Blue) vs Forecast (Red)", ylab = "Number of Trips")
+lines(test_predictions_ts, col = "red")
+```
+
+## RMSE in Test
+
+Calculate RMSE in Test:
+```{r}
+sqrt(sum((test_predictions - test_data$number_of_trips)**2))
+```
+
+
+
