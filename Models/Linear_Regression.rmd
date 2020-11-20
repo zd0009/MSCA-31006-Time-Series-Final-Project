@@ -236,12 +236,11 @@ Calculate RMSE in Train:
 sqrt(sum((m2$residuals)**2))
 ```
 
-## KPSS of Residuals in Train
+## Ljung Box Test for Residuals in Train
 
 ```{r}
-kpss.test(x = m2$residuals, null = "Trend")
+Box.test(x = m2$residuals, type = "Ljung-Box", lag = 10)
 ```
-
 
 ## ACF of Residuals in Train
 
