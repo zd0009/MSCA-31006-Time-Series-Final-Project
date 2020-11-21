@@ -96,7 +96,7 @@ kpss.test(x = train_ts, null = "Trend")
 * With a p-value of 0.01, the null hypothesis is rejected
 * Thus, this TS needs to be made stationary
 
-# Fitting a HW on Train data
+# Fitting an ADDITIVE HW on Train data
 
 Fit an additive HW:
 ```{r}
@@ -136,6 +136,39 @@ Plot ACF:
 acf(x = m1$residuals)
 ```
 
+# Fitting a MULTIPLICATIVE HW on Train Data
+
+Fit a multiplicative HW:
+```{r}
+m2 <- hw(y = train_ts, h = 61, exponential = FALSE, seasonal = "multiplicative", damped = FALSE)
+```
+
+Model:
+```{r}
+m2$model
+```
+
+## RMSE in Train
+
+Calculate RMSE
+```{r}
+sqrt(mean(m2$residuals**2))
+```
+
+## Plot forecasted Train data
+
+Plot actual vs forecast:
+```{r, fig.width = 3, fig.height = 1}
+plot(train_ts, col = "blue", main = "Number of Trips Actual (Blue) vs Forecasted (Red)", ylab = "Number of Trips")
+lines(m2$fitted, col = "red")
+```
+
+We keep the ADDITIVE model as it yields a lower AICc
+```{r}
+m1$model$aicc < m2$model$aicc
+```
+
+
 # Predicting on Test data
 
 Predict on test
@@ -156,21 +189,35 @@ test_predictions_ts <- ts(test_predictions$mean, frequency = 7)
 ```
 
 Plot predictions vs actual data:
-```{r}
+```{r, fig.width = 3, fig.height = 1}
 plot(test_ts, col = "blue", main = "Number of Trips: Actual (Blue) vs Forecast (Red)", ylab = "Number of Trips")
 lines(test_predictions_ts, col = "red")
 ```
 
-## RMSE in Test
+## RMSE and MAE in Test
 
 Calculate RMSE in Test:
 ```{r}
 sqrt(mean((test_predictions$mean - test_data$number_of_trips)**2))
 ```
 
+MAE:
+```{r}
+mean(abs(test_predictions$mean - test_data$number_of_trips))
+```
 
+## ACF of Residuals in Test
 
+Plot ACF:
+```{r, fig.width = 3, fig.height = 1}
+acf(x = (test_predictions$mean - test_data$number_of_trips))
+```
 
+## Ljung Box Test for Residuals in Test data
+
+```{r}
+Box.test(x = (test_predictions$mean - test_data$number_of_trips))
+```
 
 
 

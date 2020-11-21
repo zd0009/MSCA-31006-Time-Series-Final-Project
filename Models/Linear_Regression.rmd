@@ -254,23 +254,44 @@ test_predictions <- predict(object = m2, new = test_data)
 
 ## Plot Forecasted Test data
 
-Transform to TS object:
+Transform predictions to TS object:
 ```{r}
 test_predictions_ts <- ts(test_predictions, frequency = 365, start = c(2019, 305))
 ```
 
-Plot predictions vs actual data:
+Transform test data to TS object:
 ```{r}
-plot(trips_ts, col = "blue", main = "Number of Trips: Actual (Blue) vs Forecast (Red)", ylab = "Number of Trips")
+test_ts <- ts(test_data$number_of_trips, frequency = 365, start = c(2019, 305))
+```
+
+
+Plot predictions vs actual data:
+```{r, fig.width = 3, fig.height = 1}
+plot(test_ts, col = "blue", main = "Number of Trips: Actual (Blue) vs Forecast (Red)", ylab = "Number of Trips")
 lines(test_predictions_ts, col = "red")
 ```
 
-## RMSE in Test
+## RMSE and MAE in Test
 
 Calculate RMSE in Test:
 ```{r}
 sqrt(mean((test_predictions - test_data$number_of_trips)**2))
 ```
 
+MAE:
+```{r}
+mean(abs(test_predictions - test_data$number_of_trips))
+```
 
+## ACF of Residuals in Test
 
+Plot ACF:
+```{r, fig.width = 3, fig.height = 1}
+acf(x = (test_predictions - test_data$number_of_trips))
+```
+
+## Ljung Box Test for Residuals in Test data
+
+```{r}
+Box.test(x = (test_predictions - test_data$number_of_trips))
+```
