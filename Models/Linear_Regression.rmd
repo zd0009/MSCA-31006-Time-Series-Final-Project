@@ -43,7 +43,6 @@ Cast Date variable as date type:
 weather_data$DATE <- as.Date(weather_data$DATE, "%Y-%m-%d")
 ```
 
-
 Plot histogram of temperatures:
 ```{r}
 hist(weather_data$Daily.Avg.Temperature, main = "Distribution of Average Daily Temperature", ylab = "Frequency", xlab = "Temperature (F)")
@@ -61,7 +60,6 @@ Given that the precipitation data is zero-inflated, we will convert it to binary
 weather_data$precipitation_flag <- 0
 weather_data$precipitation_flag[weather_data$Daily.Total.Precipitation > 0] <- 1
 ```
-
 
 ## Wind Speed
 
@@ -144,7 +142,6 @@ trips_data$weekend_flag[trips_data$day_of_week == "Friday" | trips_data$day_of_w
 ```
 
 
-
 # Merge and Prepare Data
 
 ## Merge data
@@ -153,7 +150,6 @@ Merge trips and weather data:
 ```{r}
 data <- merge(x = trips_data, y = weather_data, by.x = "Date", by.y = "DATE")
 ```
-
 
 ## Remove unnecesary columns
 
@@ -273,7 +269,7 @@ lines(test_predictions_ts, col = "red")
 
 Calculate RMSE in Test:
 ```{r}
-sqrt(sum((test_predictions - test_data$number_of_trips)**2))
+sqrt(mean((test_predictions - test_data$number_of_trips)**2))
 ```
 
 

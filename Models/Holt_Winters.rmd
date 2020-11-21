@@ -1,0 +1,177 @@
+---
+title: "Holt Winters"
+author: "Lucia Ronchi Darre"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Libraries
+
+```{r}
+library(ggplot2)
+library(MASS)
+library(fpp)
+```
+
+# Import data
+
+Specify path:
+```{r}
+path <- "/Users/luciaronchi/Documents/MSCA/Time_Series/Final_Project/Data"
+```
+
+Load trips data:
+```{r}
+trips_data <- read.csv(paste(path, "RidershipTS.csv", sep = "/"), stringsAsFactors = FALSE)
+```
+
+# Explore and Prepare data
+
+Cast Date variable as date type:
+```{r}
+trips_data$Date <- as.Date(trips_data$Date, "%m/%d/%Y")
+```
+
+Convert trips to time series for easier plotting:
+```{r}
+trips_ts <- ts(trips_data$number_of_trips, frequency = 365, start = c(2018, 305))
+```
+
+Plot trips over time:
+```{r}
+plot(trips_ts, main = "Daily Number of Rideshare Trips", xlab = "Time", ylab = "Number of Trips")
+```
+
+## Split into Train and Test
+
+Select last day for the training period:
+```{r}
+train_end <- "2019-10-31"
+```
+
+Create train data:
+```{r}
+train_data <- trips_data[trips_data$Date <= train_end,]
+```
+
+Create test data:
+```{r}
+test_data <- trips_data[trips_data$Date > train_end,]
+```
+
+# Characteristics of the TS
+
+* The TS seems to have a relatively stable level (no trend)
+* The variance looks stable
+* There is definitely daily seasonality
+
+
+## Convert to TS object
+
+Convert all data to weekly seasonal data:
+```{r}
+trips_ts <- ts(trips_data$number_of_trips, frequency = 7)
+```
+
+Convert train data to weekly seasonal data:
+```{r}
+train_ts <- ts(train_data$number_of_trips, frequency = 7)
+```
+
+Convert test data to weekly seasonal data:
+```{r}
+test_ts <- ts(test_data$number_of_trips, frequency = 7)
+```
+
+Test for stationarity:
+```{r}
+kpss.test(x = train_ts, null = "Trend")
+```
+
+* The null hypothesis of KPSS test is that the TS is stationary
+* With a p-value of 0.01, the null hypothesis is rejected
+* Thus, this TS needs to be made stationary
+
+# Fitting a HW on Train data
+
+Fit an additive HW:
+```{r}
+m1 <- hw(y = train_ts, h = 61, exponential = FALSE, seasonal = "additive", damped = FALSE)
+```
+
+Model:
+```{r}
+m1$model
+```
+
+## RMSE in Train
+
+Calculate RMSE
+```{r}
+sqrt(mean(m1$residuals**2))
+```
+
+## Plot forecasted Train data
+
+Plot actual vs forecast:
+```{r, fig.width = 3, fig.height = 1}
+plot(train_ts, col = "blue", main = "Number of Trips Actual (Blue) vs Forecasted (Red)", ylab = "Number of Trips")
+lines(m1$fitted, col = "red")
+```
+
+## Ljung Box Test for Residuals in Train
+
+```{r}
+Box.test(x = m1$residuals, type = "Ljung-Box", lag = 14)
+```
+
+## ACF of Residuals in Train
+
+Plot ACF:
+```{r}
+acf(x = m1$residuals)
+```
+
+# Predicting on Test data
+
+Predict on test
+```{r}
+test_predictions <- predict(object = m1, new = test_ts)
+```
+
+Check number of predictions:
+```{r}
+length(test_predictions$mean)
+```
+
+## Plot Forecasted Test data
+
+Transform to TS object:
+```{r}
+test_predictions_ts <- ts(test_predictions$mean, frequency = 7)
+```
+
+Plot predictions vs actual data:
+```{r}
+plot(test_ts, col = "blue", main = "Number of Trips: Actual (Blue) vs Forecast (Red)", ylab = "Number of Trips")
+lines(test_predictions_ts, col = "red")
+```
+
+## RMSE in Test
+
+Calculate RMSE in Test:
+```{r}
+sqrt(mean((test_predictions$mean - test_data$number_of_trips)**2))
+```
+
+
+
+
+
+
+
+
