@@ -22,4 +22,4 @@ Final Project for the Time Series Analysis and Forecasting course - MSc. in Anal
 - Duo Zhou: zd0009@gmail.com / zd0009@uchicago.edu <br>
 - Amily Huang: amily.huang10@gmail.com / yunh@uchicago.edu <br>
 - Lui Flosi: luiflosi@uchicago.edu <br>
-- Lucía Ronchi Darré: lronchi@uchicago.edu <br>
+- Lucía Ronchi Darré (@LUCIA-RONCHI): lronchi@uchicago.edu <br>
