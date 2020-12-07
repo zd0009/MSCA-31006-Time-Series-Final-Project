@@ -1,0 +1,140 @@
+---
+title: "sARIMA_Model"
+author: "Yun Huang (Amily)"
+output: html_document
+---
+```{r include=FALSE}
+library(tseries)
+library(xts)
+library(forecast)
+library(ggplot2)
+library(ggfortify)
+library(zoo)
+```
+
+**Import Data**<br>
+```{r}
+dataPath<- "/Users/amilyhuang/Google Drive (yunh@uchicago.edu)/04-Uchicago/03-Fall_20/02-Time_Series/03-Final Project"
+rs<- read.csv(file = paste(dataPath,"RidershipTS.csv", sep = "/"), header = TRUE )
+```
+
+**Ridership TS Plot**<br>
+```{r}
+time_index <- seq(from = as.Date("2018-11-01"), 
+                  to = as.Date("2019-12-31"), by = "day")
+
+time_index_train <- seq(from = as.Date("2018-11-01"), 
+                  to = as.Date("2019-10-31"), by = "day")
+
+time_index_test <- seq(from = as.Date("2019-11-01"), 
+                  to = as.Date("2019-12-31"), by = "day")
+
+rs_ts <- as.xts(rs[,2], order.by = time_index, frequency = 365.25)
+
+train <- as.xts(rs_ts['2018-11-01/2019-10-31'], frequency = 365.25)
+
+test <- as.xts(rs_ts['2019-11-01/2019-12-31'], frequency = 365.25)
+
+```
+
+```{r}
+plot(train)
+tsdisplay(train) 
+adf.test(train, k = 25)  #Nonstationary 
+
+#Nonstationary + Seasonality at lag = 7
+```
+
+### Model Identification and Model Selection<br>
+
+We don't need boxcox transformation.<br>
+
+**First Seasonal Differencing**<br>
+```{r}
+#d=1
+diff_1s<- diff(rs_ts, lag = 7)
+plot(diff_1s)
+tsdisplay(diff_1s)
+
+#sARIMA(1,0,0)(0,1,1)[7]
+#sARIMA(2,0,0)(0,1,1)[7]
+```
+
+Second differencing is not better
+```{r}
+tsdisplay(diff(diff_1s, lag=7))
+```
+
+**Apply adf and kpss test**<br>
+```{r}
+#Null hypothesis: The process is nonstationary. 
+#Alternative hypothesis:process is stationary
+
+adf.test(diff_1s[8:365]) #Is stationary
+```
+
+
+```{r}
+#Null hypothesis: The process is stationary. 
+#Alternative hypothesis: The process is nonstationary
+
+kpss.test(diff_1s) #Is stationary
+
+```
+
+### Model Estimation<br>
+
+Use maximum likelihood estimation<br>
+```{r}
+#sARIMA(1,0,0)(0,1,1)[7]
+(res_1<-Arima(train, order = c(1,0,0), seasonal = list(order = c(0,1,1), period=7), method="ML"))
+
+#sARIMA(2,0,0)(0,1,1)[7]
+(res_2<-Arima(train, order = c(2,0,0), seasonal = list(order = c(0,1,1), period=7), method="ML"))
+
+#ARIMA(2,0,1)
+res_3<- auto.arima(train, D=1, seasonal = TRUE, trace = TRUE, method = "ML")
+```
+
+## Model Diagnostic<br>
+
+```{r}
+#H0: White Noise
+#H1: They exhibit serial correlation
+checkresiduals(res_1) 
+checkresiduals(res_2) #White Noise
+checkresiduals(res_3)
+```
+
+
+### Forecast<br>
+
+**Simple Forecasting Methods**<br>
+```{r}
+train_Mean <- meanf(train, h=61)
+train_Naive <- naive(train, h=61)
+train_SNaive <- snaive(train, h=61)
+train_Drift <- rwf(train, h=61, drift=TRUE)
+```
+
+```{r}
+(accuracy(train_Mean, test))
+(accuracy(train_Naive, test))
+(accuracy(train_SNaive, test))
+(accuracy(train_Drift, test))
+```
+
+**Forecast using Model 2**<br>
+```{r}
+forecast_2 <-forecast(res_2, h=61)
+```
+
+```{r}
+plot(forecast_2, xlab = "Daily", ylab = "Ridership")
+```
+
+
+```{r}
+(accuracy(forecast_2, test))
+```
+
