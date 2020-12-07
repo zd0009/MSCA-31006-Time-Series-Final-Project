@@ -1,0 +1,56 @@
+---
+title: "Data_Main_Characteristics_Decompose_ACF_PACF"
+author: "Yun Huang (Amily)"
+output: html_document
+---
+
+```{r include=FALSE}
+library(tseries)
+library(xts)
+library(forecast)
+library(fpp3)
+```
+
+**Import Data**
+```{r}
+dataPath<- "/Users/amilyhuang/Google Drive (yunh@uchicago.edu)/04-Uchicago/03-Fall_20/02-Time_Series/03-Final Project"
+rs<- read.csv(file = paste(dataPath,"RidershipTS.csv", sep = "/"), header = TRUE )
+```
+
+```{r}
+time_index <- seq(from = as.Date("2018-11-01"), 
+                  to = as.Date("2019-12-31"), by = "day")
+
+rs_ts <- as.xts(rs[,2], order.by = time_index, frequency = 7)
+
+Ridership <- ts(rs_ts, frequency=7)
+
+```
+
+**Plot ACF and PACF**
+```{r}
+plot(Ridership)
+tsdisplay(Ridership) 
+adf.test(Ridership, k=25)
+```
+
+**Decompose Data**
+```{r}
+decp_add<- decompose(Ridership, type = "additive")
+plot(decp_add)
+```
+
+```{r}
+Box.test(decp_add$random, lag = 25, type ="Ljung-Box") 
+#Not white noise
+```
+
+```{r}
+adf.test(decp_add$random[4:423]) #Stationary
+kpss.test(decp_add$random[4:423]) #Stationary
+```
+
+```{r}
+tsdisplay(decp_add$random)
+```
+
