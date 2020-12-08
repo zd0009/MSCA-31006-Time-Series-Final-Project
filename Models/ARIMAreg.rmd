@@ -1,0 +1,203 @@
+---
+title: "Uber Time Series Project"
+author: "Luis Flosi"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+setwd("C:/Users/luiseduardo/OneDrive/Documentos/MScA/5. Time Series/Final Project/")
+options(warn=-1)
+library(forecast)
+library(tseries)
+library(plyr)
+library(readr)
+library(readxl)
+library(fpp)
+library(TSA)
+```
+
+```{r}
+rides = read.csv("RidershipTS.csv")
+weather = read.csv("weather_final.csv")
+rides["Daily.Avg.Temperature"] = weather["Daily.Avg.Temperature"]
+rides["Daily.Total.Precipitation"] = weather["Daily.Total.Precipitation"]
+rides["Daily.Avg.WindSpeed"] = weather["Daily.Avg.WindSpeed"]
+inds = seq(as.Date("2018-11-01"), as.Date("2019-12-31"), by = "day")
+rides_ts = ts(cbind(rides$number_of_trips,
+                    rides$Daily.Avg.Temperature,
+                    rides$Daily.Total.Precipitation,
+                    rides$Daily.Avg.WindSpeed),
+           start = c(2018, as.numeric(format(inds[1], "%j"))),
+            frequency =  365)
+colnames(rides_ts) = c("num_rides", "avg_temp", "total_precipitation", "avg_windspeed")
+tsdisplay(rides_ts[,1])
+```
+
+
+```{r}
+for (i in 1:4){
+  lab = colnames(rides_ts)[i]
+  plot(rides_ts[,i], ylab = lab)
+}
+```
+
+```{r}
+train = ts(window(rides_ts, end = c(2019, 365-61)))
+train_xreg = train[,2:4]
+train = train[,1]
+
+test = ts(window(rides_ts, start = c(2019, 365-60)))
+test_xreg = test[,2:4]
+test = test[,1]
+
+```
+
+```{r}
+reg_arima = auto.arima(train, xreg = train_xreg, D = 1)
+fcst = forecast(reg_arima, xreg = test_xreg)
+rms = sqrt(sum((rides_ts[366:426,1] - fcst$mean)^2)/61)
+rms
+```
+```{r}
+mae = sum(abs(rides_ts[366:426,1] - fcst$mean))/61
+mae
+```
+
+
+```{r}
+plot(fcst)
+```
+
+```{r}
+checkresiduals(reg_arima)
+```
+```{r}
+summary(reg_arima)
+```
+
+
+```{r}
+reg = lm(train~train_xreg)
+summary(reg)
+```
+
+```{r}
+plot(reg$residuals, type = "l")
+```
+```{r}
+tsdisplay(reg$residuals)
+```
+
+
+```{r}
+reg_arima = Arima(train, order = c(2,0,0), seasonal = c(0,1,1), xreg = train_xreg)
+fcst = forecast(reg_arima, xreg = test_xreg)
+rms = sqrt(sum((rides_ts[366:426,1] - fcst$mean)^2)/61)
+rms
+```
+
+```{r}
+mae = sum(abs(rides_ts[366:426,1] - fcst$mean))/61
+mae
+```
+
+```{r}
+plot(fcst)
+```
+
+
+```{r}
+checkresiduals(reg_arima)
+```
+
+```{r}
+p = periodogram(rides_ts[,1])
+periodogram(rides_ts[,1])
+```
+
+
+```{r}
+# CV parameters
+rides = ts(rides_ts[,"num_rides"], frequency = 7)
+rides_xreg = ts(rides_ts[,-1], frequency = 7)
+period = 7
+total_iterations = 60
+n = length(rides)
+k = 305 # min samples in sliding window and initial samples in expanding window
+H = 60 # weeks of forecast horizon
+
+# Arima parameters
+p = 2
+d = 0
+q = 0
+P = 0
+D = 1
+Q = 1
+s = 12
+
+# Initialize performance tables - ARIMA
+mae_1_1 = matrix(NA,n-k,H)
+mae_1_2 = matrix(NA,n-k,H)
+rmse_1_1 = matrix(NA,n-k,H)
+rmse_1_2 = matrix(NA,n-k,H)
+
+# Calculate all models and save performance metrics
+st <- tsp(rides)[1]+(k-2)/period
+
+# One Month rolling forecasting
+for(i in 1:(n-k-60)){
+  # Expanding Window - Window Length: k+i
+  train_1 <- window(rides,           end=st + i/period)
+  train_1_xreg <- window(rides_xreg, end=st + i/period)
+  
+  # Sliding Window - # Window Length: k
+  train_2 <- window(rides,           start=st+(i-k+1)/period,
+                                        end=st+i/period)
+  train_2_xreg <- window(rides_xreg, start=st+(i-k+1)/period,
+                                        end=st+i/period)
+  
+  # Test Window  - Window Length H
+  test_cv <- window(rides,           start=st + (i+1)/period,
+                                        end=st + (i+H)/period)
+  test_cv_xreg <- window(rides_xreg, start=st + (i+1)/period,
+                                        end=st + (i+H)/period)
+  
+  # Fit ARIMA expanding window
+  fit_1_1 <- Arima(train_1, order = c(2,0,0), seasonal = c(0,1,1),
+                   xreg = train_1_xreg)
+  fcast_1_1 <- forecast(fit_1_1, xreg = test_cv_xreg, h=H)
+  
+  # Fit ARIMA sliding window  
+  fit_1_2 <- Arima(train_2, order = c(2,0,0), seasonal = c(0,1,1),
+                   xreg = train_2_xreg)
+  fcast_1_2 <- forecast(fit_1_2, xreg = test_cv_xreg,  h=H)
+  
+  # Performance metrics
+  err_1 = fcast_1_1[['mean']]-test_cv
+  err_2 = fcast_1_2[['mean']]-test_cv
+  mae_1_1[i,1:length(test_cv)] <- abs(err_1)
+  mae_1_2[i,1:length(test_cv)] <- abs(err_2)
+  
+  rmse_1_1[i,1:length(test_cv)] <- sqrt(sum(err_1^2)/length(err_1))
+  rmse_1_2[i,1:length(test_cv)] <- sqrt(sum(err_2^2)/length(err_2))
+}
+
+# Visualize performance metrics
+plot(1:length(colMeans(mae_1_1,na.rm=TRUE)), colMeans(mae_1_1,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="MAE")
+lines(1:length(colMeans(mae_1_2,na.rm=TRUE)), colMeans(mae_1_2,na.rm=TRUE), type="l",col=2)
+legend("bottomright",legend=c("ARIMAX - Expanding Window",
+                          "ARIMAX - Sliding Window"),col=1:2,lty=1)
+
+plot(1:length(colMeans(rmse_1_1,na.rm=TRUE)), colMeans(rmse_1_1,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="RMSE",
+     ylim = c(25,35))
+lines(1:length(colMeans(rmse_1_2,na.rm=TRUE)), colMeans(rmse_1_2,na.rm=TRUE), type="l",col=2)
+legend("topleft",legend=c("ARIMA - Expanding Window",
+                          "ARIMA - Sliding Window"),col=1:2,lty=1)
+colMeans(mae_1_2,na.rm=TRUE)
+```
+
+
+``` {r}
+barplot(c(31171, 35141, 40426, 27021, 27891), names.arg = c("LM", "H-W", "sARIMA", "LM with ARIMA", "VAR"), col = c("grey", "grey", "grey", "blue", "grey"), main = "MAE per model produced")
+```
